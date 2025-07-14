@@ -106,6 +106,18 @@ export default function BusinessIncomePage() {
   const totalYearlyIncome = incomeData.reduce((sum, data) => sum + data.totalIncome, 0)
   const averageMonthlyIncome = totalYearlyIncome / incomeData.length
 
+  // Mock device fleet for statistics
+  const deviceFleet = [
+    { device_id: '224', income: 12000, filter_health: 60 },
+    { device_id: '225', income: 15000, filter_health: 35 },
+    { device_id: '226', income: 9000, filter_health: 80 },
+    { device_id: '227', income: 17000, filter_health: 20 },
+  ]
+  const totalDeviceIncome = deviceFleet.reduce((sum, d) => sum + d.income, 0)
+  const soonestService = deviceFleet.reduce((min, d) => d.filter_health < min.filter_health ? d : min, deviceFleet[0])
+  const getDaysLeft = (filterHealth) => Math.max(0, Math.round(filterHealth * 1.5))
+  const avgIncome = totalDeviceIncome / deviceFleet.length
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 relative overflow-hidden">
       <div className="absolute inset-0 opacity-40">
@@ -345,6 +357,71 @@ export default function BusinessIncomePage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Device Fleet Income Section */}
+        <div className="mb-8">
+          <h2 className="text-xl font-bold text-blue-900 mb-4">Purifier Fleet Income</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {deviceFleet.map((device) => (
+              <Card key={device.device_id} className="border-blue-200">
+                <CardHeader>
+                  <CardTitle className="text-blue-900">Device {device.device_id}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700 font-medium">Money Made:</span>
+                    <span className="font-bold text-green-700">₹{device.income.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700 font-medium">Service in:</span>
+                    <span className="font-bold text-blue-900">{getDaysLeft(device.filter_health)} days</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700 font-medium">Filter Health:</span>
+                    <span className="font-bold text-blue-900">{device.filter_health}%</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+        {/* End Device Fleet Income Section */}
+
+        {/* Extra Statistics Section */}
+        <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="border-blue-200">
+            <CardHeader>
+              <CardTitle className="text-blue-900">Total Money Made (Fleet)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-green-700 mb-2">₹{totalDeviceIncome.toLocaleString()}</div>
+              <p className="text-blue-600">From all purifiers you have lent</p>
+            </CardContent>
+          </Card>
+          <Card className="border-blue-200">
+            <CardHeader>
+              <CardTitle className="text-blue-900">Average Income per Purifier</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-blue-900 mb-2">₹{avgIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+              <p className="text-blue-600">Across {deviceFleet.length} purifiers</p>
+            </CardContent>
+          </Card>
+          <Card className="border-blue-200 md:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-blue-900">Soonest Service Needed</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                <span className="font-bold text-blue-900">Device {soonestService.device_id}</span>
+                <span className="text-blue-700">needs service in</span>
+                <span className="font-bold text-orange-600">{getDaysLeft(soonestService.filter_health)} days</span>
+                <span className="text-blue-700">(Filter Health: {soonestService.filter_health}%)</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        {/* End Extra Statistics Section */}
       </div>
     </div>
   )

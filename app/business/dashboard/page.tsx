@@ -119,6 +119,20 @@ export default function BusinessDashboard() {
     return () => clearInterval(interval)
   }, [])
 
+  // Add mock income to each device
+  const devicesWithIncome = devices.map((d, i) => ({
+    ...d,
+    income: Math.floor(5000 + Math.random() * 10000), // mock income in INR
+  }))
+  const totalIncome = devicesWithIncome.reduce((sum, d) => sum + d.income, 0)
+
+  // Helper to estimate days left before service based on filter_health
+  const getDaysLeft = (filterHealth: string) => {
+    const health = Number.parseFloat(filterHealth)
+    // Assume 100 = new, 0 = needs service, 1 health = 1.5 days left
+    return Math.max(0, Math.round(health * 1.5))
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "online":
@@ -236,8 +250,8 @@ export default function BusinessDashboard() {
               <Droplets className="h-4 w-4 text-blue-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-900">{devices.length}</div>
-              <p className="text-xs text-blue-600 mt-1">{devices.filter((d) => d.status === "online").length} online</p>
+              <div className="text-2xl font-bold text-blue-900">{devicesWithIncome.length}</div>
+              <p className="text-xs text-blue-600 mt-1">{devicesWithIncome.filter((d) => d.status === "online").length} online</p>
             </CardContent>
           </Card>
 
@@ -517,6 +531,39 @@ export default function BusinessDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Purifier Fleet Cards */}
+        <div className="mb-8">
+          <h2 className="text-xl font-bold text-blue-900 mb-4">Your Purifier Fleet</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {devicesWithIncome.map((device) => (
+              <Card key={device.device_id} className="border-blue-200">
+                <CardHeader>
+                  <CardTitle className="text-blue-900 flex items-center gap-2">
+                    Device {device.device_id}
+                    <Badge className="ml-2">{device.status}</Badge>
+                  </CardTitle>
+                  <CardDescription className="text-blue-600">{device.location}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700 font-medium">Service in:</span>
+                    <span className="font-bold text-blue-900">{getDaysLeft(device.filter_health)} days</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700 font-medium">Money Made:</span>
+                    <span className="font-bold text-green-700">₹{device.income.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700 font-medium">Filter Health:</span>
+                    <span className="font-bold text-blue-900">{Number(device.filter_health).toFixed(1)}%</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+        {/* End Purifier Fleet Cards */}
       </div>
     </div>
   )

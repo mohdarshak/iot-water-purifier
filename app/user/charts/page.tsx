@@ -1,9 +1,11 @@
 "use client"
-import React, { useState, useEffect } from "react"
+
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import {
   LineChart,
@@ -16,9 +18,11 @@ import {
   Area,
   BarChart,
   Bar,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts"
-import { Droplets, Thermometer, Activity, Filter, LogOut, RefreshCw, ShoppingCart, Wifi, WifiOff, BarChart3 } from "lucide-react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Droplets, Thermometer, Activity, Filter, LogOut, RefreshCw, BarChart3, TrendingUp, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
 interface WaterData {
@@ -32,11 +36,11 @@ interface WaterData {
   filter_health: string
 }
 
-export default function UserDashboard() {
+export default function ChartsPage() {
   const [devicesData, setDevicesData] = useState<WaterData[]>([])
   const [historicalData, setHistoricalData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedDevice, setSelectedDevice] = useState<string | null>(null)
+  const [selectedDevice, setSelectedDevice] = useState<string>("220")
 
   // Generate 40 devices with varied data
   const generateDevices = (baseData: WaterData[]) => {
@@ -71,9 +75,8 @@ export default function UserDashboard() {
       const allDevices = generateDevices(data)
       setDevicesData(allDevices)
 
-      // Generate historical data for the first device or selected device
-      const deviceToUse = selectedDevice || allDevices[0]?.device_id || "220"
-      const deviceData = allDevices.find((d: WaterData) => d.device_id === deviceToUse) || allDevices[0]
+      // Generate historical data for selected device
+      const deviceData = allDevices.find(d => d.device_id === selectedDevice) || allDevices[0]
       
       if (deviceData) {
         const historical = Array.from({ length: 24 }, (_, i) => ({
@@ -82,6 +85,7 @@ export default function UserDashboard() {
           tds: Math.floor(Number.parseInt(deviceData.tds) + (Math.random() - 0.5) * 50),
           temperature: (Number.parseFloat(deviceData.temprature) + (Math.random() - 0.5) * 3).toFixed(1),
           flow: (Number.parseFloat(deviceData.flow) + (Math.random() - 0.5) * 1).toFixed(2),
+          filter_health: (Number.parseFloat(deviceData.filter_health) + (Math.random() - 0.5) * 10).toFixed(1),
         }))
         setHistoricalData(historical)
       }
@@ -129,15 +133,13 @@ export default function UserDashboard() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
         <div className="text-center">
           <RefreshCw className="h-8 w-8 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-blue-700">Loading water quality data...</p>
+          <p className="text-blue-700">Loading charts and analytics...</p>
         </div>
       </div>
     )
   }
 
-  const selectedDeviceData = selectedDevice 
-    ? devicesData.find(d => d.device_id === selectedDevice) 
-    : devicesData[0]
+  const selectedDeviceData = devicesData.find(d => d.device_id === selectedDevice) || devicesData[0]
   
   const phValue = Number.parseFloat(selectedDeviceData?.ph || "0")
   const tdsValue = Number.parseInt(selectedDeviceData?.tds || "0")
@@ -145,29 +147,46 @@ export default function UserDashboard() {
   const filterHealthValue = Number.parseFloat(selectedDeviceData?.filter_health || "0")
   const flowValue = Number.parseFloat(selectedDeviceData?.flow || "0")
 
+  // Prepare data for pie chart
+  const pieData = [
+    { name: "pH Level", value: phValue, color: "#3b82f6" },
+    { name: "TDS Level", value: tdsValue / 10, color: "#06b6d4" },
+    { name: "Temperature", value: temperatureValue, color: "#f59e0b" },
+    { name: "Flow Rate", value: flowValue * 10, color: "#10b981" },
+  ]
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 relative overflow-hidden">
       <div className="absolute inset-0 opacity-40">
         <div className="w-full h-full bg-gradient-to-br from-blue-100/20 to-purple-100/20"></div>
       </div>
-      {/* Header */}
+      
+      {/* Header with Device Selector */}
       <header className="bg-white/80 backdrop-blur-xl shadow-lg border-b border-white/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-4">
+              <Link href="/user/dashboard">
+                <Button variant="outline" size="sm">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Dashboard
+                </Button>
+              </Link>
               <div className="flex items-center space-x-2">
                 <Droplets className="h-6 w-6 text-blue-600" />
-                <h1 className="text-xl font-bold text-blue-900">PurityGrid</h1>
+                <h1 className="text-xl font-bold text-blue-900">PurityGrid Analytics</h1>
               </div>
-              
+            </div>
+            
+            <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <span className="text-sm font-medium text-blue-700">Device:</span>
-                <Select value={selectedDevice || "220"} onValueChange={setSelectedDevice}>
+                <Select value={selectedDevice} onValueChange={setSelectedDevice}>
                   <SelectTrigger className="w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {devicesData.map((device: WaterData) => (
+                    {devicesData.map((device) => (
                       <SelectItem key={device.device_id} value={device.device_id}>
                         Device {device.device_id}
                       </SelectItem>
@@ -175,29 +194,16 @@ export default function UserDashboard() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link href="/user/charts">
-                <Button variant="outline" size="sm">
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Analytics
-                </Button>
-              </Link>
-              <Link href="/user/rent">
-                <Button variant="outline" size="sm">
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  Rent Device
-                </Button>
-              </Link>
-              <Link href="/user/billing">
-                <Button variant="outline" size="sm">
-                  View Bills
-                </Button>
-              </Link>
+              
+              <Badge variant="outline" className="bg-blue-100 text-blue-700">
+                {devicesData.length} Devices
+              </Badge>
+              
               <Button onClick={fetchWaterData} variant="outline" size="sm">
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
               </Button>
+              
               <Link href="/">
                 <Button variant="outline" size="sm">
                   <LogOut className="h-4 w-4 mr-2" />
@@ -210,119 +216,33 @@ export default function UserDashboard() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Device Cards */}
+        {/* Device Status Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-blue-900">Your Water Purifiers</h2>
-            <div className="flex items-center space-x-4">
-              <Badge className="bg-blue-100 text-blue-700">
-                {devicesData.length} Devices Active
-              </Badge>
-              <Button onClick={fetchWaterData} variant="outline" size="sm">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
+            <div>
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Device {selectedDevice} Analytics
+              </h2>
+              <p className="text-blue-600 mt-2">
+                Real-time monitoring and historical data analysis
+              </p>
             </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-            {devicesData.slice(0, 12).map((device: WaterData) => {
-              const isSelected = selectedDevice === device.device_id
-              const phValue = Number.parseFloat(device.ph)
-              const tdsValue = Number.parseInt(device.tds)
-              const filterHealth = Number.parseFloat(device.filter_health)
-              const temperature = Number.parseFloat(device.temprature)
-              const flow = Number.parseFloat(device.flow)
-              
-              return (
-                <Card 
-                  key={device.device_id}
-                  className={`border-white/30 bg-white/80 backdrop-blur-lg shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer ${
-                    isSelected ? 'ring-2 ring-blue-500 shadow-blue-500/20' : ''
-                  }`}
-                  onClick={() => setSelectedDevice(device.device_id)}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                        Device {device.device_id}
-                      </CardTitle>
-                      <div className="flex items-center space-x-2">
-                        <Wifi className="h-4 w-4 text-green-500" />
-                        <Badge className="bg-green-100 text-green-700 text-xs">
-                          Online
-                        </Badge>
-                      </div>
-                    </div>
-                    <CardDescription className="text-blue-600">
-                      {device.filter_type} Filter • Last updated: {new Date(device.timestamp).toLocaleTimeString()}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-900">{phValue.toFixed(1)}</div>
-                        <div className="text-xs text-blue-600">pH Level</div>
-                        <div className={`w-2 h-2 rounded-full mx-auto mt-1 ${getStatusColor(phValue, "ph")}`}></div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-900">{tdsValue}</div>
-                        <div className="text-xs text-blue-600">TDS (ppm)</div>
-                        <div className={`w-2 h-2 rounded-full mx-auto mt-1 ${getStatusColor(tdsValue, "tds")}`}></div>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-blue-600">Filter Health</span>
-                        <span className="font-semibold text-blue-900">{filterHealth.toFixed(1)}%</span>
-                      </div>
-                      <Progress value={filterHealth} className="h-2" />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div className="text-center">
-                        <div className="font-semibold text-blue-900">{temperature.toFixed(1)}°C</div>
-                        <div className="text-xs text-blue-600">Temperature</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="font-semibold text-blue-900">{flow.toFixed(1)} L/min</div>
-                        <div className="text-xs text-blue-600">Flow Rate</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-          
-          <div className="text-center mb-8">
-            <p className="text-blue-600 text-sm">
-              Showing 12 of {devicesData.length} devices. Use the device selector in the header to view specific devices.
-            </p>
+            <div className="flex items-center space-x-4">
+              <Badge
+                variant="outline"
+                className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-none shadow-lg"
+              >
+                Device {selectedDevice} - Online
+              </Badge>
+              <Badge
+                variant="outline"
+                className="bg-gradient-to-r from-blue-500 to-purple-500 text-white border-none shadow-lg"
+              >
+                {selectedDeviceData?.filter_type} Filter
+              </Badge>
+            </div>
           </div>
         </div>
-
-        {/* Selected Device Status */}
-        {selectedDeviceData && (
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-blue-900">Device {selectedDeviceData.device_id} Details</h2>
-              <div className="flex items-center space-x-4">
-                <Badge
-                  className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-none shadow-lg"
-                >
-                  Device {selectedDeviceData.device_id} - Online
-                </Badge>
-                <Badge
-                  className="bg-gradient-to-r from-blue-500 to-purple-500 text-white border-none shadow-lg"
-                >
-                  {selectedDeviceData.filter_type} Filter
-                </Badge>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -394,7 +314,7 @@ export default function UserDashboard() {
           </Card>
         </div>
 
-        {/* Charts */}
+        {/* Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card className="border-white/30 bg-white/80 backdrop-blur-lg shadow-xl">
             <CardHeader>
@@ -453,7 +373,7 @@ export default function UserDashboard() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card className="border-white/30 bg-white/80 backdrop-blur-lg shadow-xl">
             <CardHeader>
               <CardTitle className="text-blue-900">Temperature Trend</CardTitle>
@@ -511,6 +431,75 @@ export default function UserDashboard() {
           </Card>
         </div>
 
+        {/* Additional Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Card className="border-white/30 bg-white/80 backdrop-blur-lg shadow-xl">
+            <CardHeader>
+              <CardTitle className="text-blue-900">Filter Health Trend</CardTitle>
+              <CardDescription className="text-blue-600">Filter performance over time</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={{
+                  filter_health: {
+                    label: "Filter Health (%)",
+                    color: "hsl(var(--chart-5))",
+                  },
+                }}
+                className="h-[300px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={historicalData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="time" />
+                    <YAxis domain={[0, 100]} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Line type="monotone" dataKey="filter_health" stroke="#8b5cf6" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/30 bg-white/80 backdrop-blur-lg shadow-xl">
+            <CardHeader>
+              <CardTitle className="text-blue-900">Metrics Overview</CardTitle>
+              <CardDescription className="text-blue-600">Current metrics distribution</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={{
+                  value: {
+                    label: "Value",
+                    color: "hsl(var(--chart-6))",
+                  },
+                }}
+                className="h-[300px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Current Flow Rate */}
         <Card className="border-blue-200 mt-6">
           <CardHeader>
@@ -520,11 +509,11 @@ export default function UserDashboard() {
           <CardContent>
             <div className="text-center">
               <div className="text-4xl font-bold text-blue-900 mb-2">{flowValue.toFixed(2)} L/min</div>
-              <p className="text-blue-600">Current flow rate</p>
+              <p className="text-blue-600">Current flow rate for Device {selectedDevice}</p>
             </div>
           </CardContent>
         </Card>
       </div>
     </div>
   )
-}
+} 

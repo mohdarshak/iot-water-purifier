@@ -18,12 +18,12 @@ export default function HomePage() {
               <a href="#features" className="text-blue-700 hover:text-blue-900">
                 Features
               </a>
-              <a href="#about" className="text-blue-700 hover:text-blue-900">
+              <Link href="/about" className="text-blue-700 hover:text-blue-900">
                 About
-              </a>
-              <a href="#contact" className="text-blue-700 hover:text-blue-900">
+              </Link>
+              <Link href="/contact" className="text-blue-700 hover:text-blue-900">
                 Contact
-              </a>
+              </Link>
             </nav>
           </div>
         </div>
