@@ -31,8 +31,14 @@ import {
   TrendingUp,
   DollarSign,
   Wrench,
+  CheckCircle,
+  XCircle,
+  Clock,
 } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/lib/authContext"
+import { useRouter } from "next/navigation"
+import { getRequests, updateRequestStatus, RentalRequest } from "@/lib/rentalRequests"
 
 interface DeviceData {
   device_id: string
@@ -48,7 +54,24 @@ interface DeviceData {
 }
 
 export default function BusinessDashboard() {
-  const [devices, setDevices] = useState<DeviceData[]>([])
+  const { user, userType } = useAuth()
+  const router = useRouter()
+
+  // Redirect to login if not logged in or not a business
+  useEffect(() => {
+    if (!user || userType !== "Business") {
+      router.replace("/login")
+    }
+  }, [user, userType, router])
+
+  // Type guard for Owner
+  function isOwner(u: any): u is import("@/lib/mockData").Owner {
+    return u && u.type === "Business" && Array.isArray(u.supplied_purifiers)
+  }
+
+  // Use the logged-in owner's purifiers
+  const suppliedPurifiers = isOwner(user) ? user.supplied_purifiers : []
+
   const [isLoading, setIsLoading] = useState(true)
   const [selectedDevice, setSelectedDevice] = useState<string>("all")
 
@@ -105,7 +128,7 @@ export default function BusinessDashboard() {
           status: "online",
         },
       ]
-      setDevices(mockDevices)
+      // setDevices(mockDevices) // This line is no longer needed as we use suppliedPurifiers directly
     } catch (error) {
       console.error("Error fetching data:", error)
     } finally {
@@ -114,17 +137,31 @@ export default function BusinessDashboard() {
   }
 
   useEffect(() => {
-    fetchDevicesData()
+    // fetchDevicesData() // This line is no longer needed as we use suppliedPurifiers directly
     const interval = setInterval(fetchDevicesData, 30000)
     return () => clearInterval(interval)
   }, [])
 
   // Add mock income to each device
-  const devicesWithIncome = devices.map((d, i) => ({
+  const devicesWithIncome = suppliedPurifiers.map((d, i) => ({
     ...d,
     income: Math.floor(5000 + Math.random() * 10000), // mock income in INR
   }))
   const totalIncome = devicesWithIncome.reduce((sum, d) => sum + d.income, 0)
+
+  // Earnings Dashboard Data
+  // Generate mock monthly stats for the last 6 months
+  const now = new Date()
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    return d.toLocaleString('default', { month: 'short', year: '2-digit' })
+  }).reverse()
+  // For demo, randomly distribute totalIncome across months
+  const monthlyStats = months.map((month, i) => ({
+    month,
+    income: Math.floor(totalIncome / 6 + (Math.random() - 0.5) * 0.2 * totalIncome),
+  }))
+  const monthlyTotal = monthlyStats.reduce((sum, m) => sum + m.income, 0)
 
   // Helper to estimate days left before service based on filter_health
   const getDaysLeft = (filterHealth: string) => {
@@ -162,12 +199,12 @@ export default function BusinessDashboard() {
 
   // Generate chart data
   const deviceStatusData = [
-    { name: "Online", value: devices.filter((d) => d.status === "online").length, color: "#10b981" },
-    { name: "Maintenance", value: devices.filter((d) => d.status === "maintenance").length, color: "#f59e0b" },
-    { name: "Offline", value: devices.filter((d) => d.status === "offline").length, color: "#ef4444" },
+    { name: "Online", value: suppliedPurifiers.filter((d) => d.status === "online").length, color: "#10b981" },
+    { name: "Maintenance", value: suppliedPurifiers.filter((d) => d.status === "maintenance").length, color: "#f59e0b" },
+    { name: "Offline", value: suppliedPurifiers.filter((d) => d.status === "offline").length, color: "#ef4444" },
   ]
 
-  const avgMetrics = devices.reduce(
+  const avgMetrics = suppliedPurifiers.reduce(
     (acc, device) => {
       acc.ph += Number.parseFloat(device.ph)
       acc.tds += Number.parseInt(device.tds)
@@ -178,19 +215,49 @@ export default function BusinessDashboard() {
     { ph: 0, tds: 0, temperature: 0, flow: 0 },
   )
 
-  if (devices.length > 0) {
-    avgMetrics.ph /= devices.length
-    avgMetrics.tds /= devices.length
-    avgMetrics.temperature /= devices.length
-    avgMetrics.flow /= devices.length
+  if (suppliedPurifiers.length > 0) {
+    avgMetrics.ph /= suppliedPurifiers.length
+    avgMetrics.tds /= suppliedPurifiers.length
+    avgMetrics.temperature /= suppliedPurifiers.length
+    avgMetrics.flow /= suppliedPurifiers.length
   }
 
   const hourlyData = Array.from({ length: 24 }, (_, i) => ({
     time: `${23 - i}:00`,
     avgPh: (avgMetrics.ph + (Math.random() - 0.5) * 0.3).toFixed(2),
     avgTds: Math.floor(avgMetrics.tds + (Math.random() - 0.5) * 30),
-    totalFlow: (avgMetrics.flow * devices.length + (Math.random() - 0.5) * 5).toFixed(2),
+    totalFlow: (avgMetrics.flow * suppliedPurifiers.length + (Math.random() - 0.5) * 5).toFixed(2),
   }))
+
+  // Rental Requests (mocked)
+  const [rentalRequests, setRentalRequests] = useState<RentalRequest[]>([])
+  // Load requests on mount
+  useEffect(() => {
+    setRentalRequests(getRequests())
+    const interval = setInterval(() => setRentalRequests(getRequests()), 2000)
+    return () => clearInterval(interval)
+  }, [])
+  function handleRequestAction(id: string, action: "accepted" | "rejected") {
+    updateRequestStatus(id, action)
+    setRentalRequests(getRequests())
+  }
+
+  // Alerts & Reminders
+  const purifierAlerts = suppliedPurifiers
+    .map((device) => {
+      const filterHealth = Number.parseFloat(device.filter_health)
+      const tds = Number.parseInt(device.tds)
+      const ph = Number.parseFloat(device.ph)
+      const alerts: string[] = []
+      if (filterHealth < 20) alerts.push("Low Filter Health")
+      if (tds > 250) alerts.push("High TDS")
+      if (ph < 6.5 || ph > 8.5) alerts.push("pH Out of Range")
+      if (device.status === "maintenance") alerts.push("Maintenance Required")
+      if (device.status === "offline") alerts.push("Device Offline")
+      if ((device as any).subscription_days_left !== undefined && (device as any).subscription_days_left < 7) alerts.push("Subscription Expiring Soon")
+      return alerts.length > 0 ? { device, alerts } : null
+    })
+    .filter(Boolean) as { device: any; alerts: string[] }[]
 
   if (isLoading) {
     return (
@@ -241,6 +308,176 @@ export default function BusinessDashboard() {
         </div>
       </header>
 
+      {/* Alerts & Reminders Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="text-blue-900">Alerts & Reminders</CardTitle>
+            <CardDescription>Devices needing attention or with expiring subscriptions.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {purifierAlerts.length === 0 && (
+              <div className="text-blue-600">No alerts or reminders at this time.</div>
+            )}
+            <div className="space-y-4">
+              {purifierAlerts.map(({ device, alerts }) => (
+                <div key={device.device_id} className="flex flex-col md:flex-row md:items-center md:justify-between bg-white/80 rounded-lg shadow p-4 border border-blue-100">
+                  <div className="flex flex-col md:flex-row md:items-center gap-2">
+                    <span className="font-semibold text-blue-900">Device {device.device_id}</span>
+                    <span className="text-blue-700">({device.location})</span>
+                    <Badge className="bg-blue-100 text-blue-700 border-blue-200">{device.filter_type}</Badge>
+                    <span className="text-xs text-blue-500 ml-2">Last updated: {new Date(device.timestamp).toLocaleString()}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
+                    {alerts.map((alert, idx) => (
+                      <Badge
+                        key={idx}
+                        className={
+                          alert === "Low Filter Health"
+                            ? "bg-red-100 text-red-700 border-red-200"
+                            : alert === "High TDS"
+                            ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+                            : alert === "pH Out of Range"
+                            ? "bg-orange-100 text-orange-800 border-orange-200"
+                            : alert === "Maintenance Required"
+                            ? "bg-purple-100 text-purple-800 border-purple-200"
+                            : alert === "Device Offline"
+                            ? "bg-gray-200 text-gray-800 border-gray-300"
+                            : alert === "Subscription Expiring Soon"
+                            ? "bg-pink-100 text-pink-800 border-pink-200"
+                            : "bg-gray-100 text-gray-800 border-gray-200"
+                        }
+                      >
+                        {alert}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Rental Requests Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="text-blue-900">Rental Requests</CardTitle>
+            <CardDescription>Approve or reject new purifier rental requests from users.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {rentalRequests.length === 0 && (
+              <div className="text-blue-600">No rental requests at this time.</div>
+            )}
+            <div className="space-y-4">
+              {rentalRequests.map(req => (
+                <div key={req.id} className="flex flex-col md:flex-row md:items-center md:justify-between bg-white/80 rounded-lg shadow p-4 border border-blue-100">
+                  <div className="flex flex-col md:flex-row md:items-center gap-2">
+                    <span className="font-semibold text-blue-900">{req.userName}</span>
+                    <span className="text-blue-700">({req.userEmail}, {req.userPhone})</span>
+                    <span className="text-blue-700">requests</span>
+                    <Badge className="bg-blue-100 text-blue-700 border-blue-200">{req.model}</Badge>
+                    <span className="text-blue-700">at</span>
+                    <span className="font-medium text-blue-900">{req.location}</span>
+                    <span className="text-xs text-blue-500 ml-2">{new Date(req.date).toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2 md:mt-0">
+                    {req.status === "pending" && (
+                      <>
+                        <Button size="sm" className="bg-green-500 text-white" onClick={() => handleRequestAction(req.id, "accepted")}> <CheckCircle className="h-4 w-4 mr-1" /> Accept </Button>
+                        <Button size="sm" className="bg-red-500 text-white" onClick={() => handleRequestAction(req.id, "rejected")}> <XCircle className="h-4 w-4 mr-1" /> Reject </Button>
+                        <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 ml-2"><Clock className="h-3 w-3 mr-1 inline" /> Pending</Badge>
+                      </>
+                    )}
+                    {req.status === "accepted" && (
+                      <Badge className="bg-green-100 text-green-700 border-green-200"><CheckCircle className="h-3 w-3 mr-1 inline" /> Accepted</Badge>
+                    )}
+                    {req.status === "rejected" && (
+                      <Badge className="bg-red-100 text-red-700 border-red-200"><XCircle className="h-3 w-3 mr-1 inline" /> Rejected</Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Earnings Dashboard Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="text-blue-900">Earnings Dashboard</CardTitle>
+            <CardDescription>Track your total and monthly income from all supplied purifiers.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div>
+                <div className="text-xs text-blue-600 mb-1">Total Income</div>
+                <div className="text-3xl font-bold text-blue-900 mb-1">₹{totalIncome.toLocaleString()}</div>
+                <div className="text-xs text-blue-600">All time</div>
+              </div>
+              <div>
+                <div className="text-xs text-blue-600 mb-1">Last Month</div>
+                <div className="text-2xl font-bold text-blue-900 mb-1">₹{monthlyStats[monthlyStats.length-1].income.toLocaleString()}</div>
+                <div className="text-xs text-blue-600">{monthlyStats[monthlyStats.length-1].month}</div>
+              </div>
+              <div>
+                <div className="text-xs text-blue-600 mb-1">6-Month Total</div>
+                <div className="text-2xl font-bold text-blue-900 mb-1">₹{monthlyTotal.toLocaleString()}</div>
+                <div className="text-xs text-blue-600">Last 6 months</div>
+              </div>
+            </div>
+            <div className="h-64">
+              <ChartContainer
+                config={{ income: { label: "Income", color: "#3b82f6" } }}
+                className="h-full"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyStats}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="income" fill="#3b82f6" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </div>
+            {/* Per-Device Earnings Table */}
+            <div className="mt-8">
+              <div className="text-lg font-semibold text-blue-900 mb-2">Earnings by Device</div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full bg-white/80 rounded-lg shadow">
+                  <thead>
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-bold text-blue-700">Device</th>
+                      <th className="px-4 py-2 text-left text-xs font-bold text-blue-700">Location</th>
+                      <th className="px-4 py-2 text-left text-xs font-bold text-blue-700">Filter Type</th>
+                      <th className="px-4 py-2 text-right text-xs font-bold text-blue-700">Income (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {devicesWithIncome
+                      .slice()
+                      .sort((a, b) => b.income - a.income)
+                      .map((device) => (
+                        <tr key={device.device_id} className="border-b border-blue-100">
+                          <td className="px-4 py-2 font-medium text-blue-900">{device.device_id}</td>
+                          <td className="px-4 py-2 text-blue-700">{device.location}</td>
+                          <td className="px-4 py-2 text-blue-700">{device.filter_type}</td>
+                          <td className="px-4 py-2 text-right text-blue-900 font-semibold">{device.income.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -273,7 +510,7 @@ export default function BusinessDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-900">
-                {(avgMetrics.flow * devices.length).toFixed(1)} L/min
+                {(avgMetrics.flow * suppliedPurifiers.length).toFixed(1)} L/min
               </div>
               <p className="text-xs text-blue-600 mt-1">Combined output</p>
             </CardContent>
@@ -286,7 +523,7 @@ export default function BusinessDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-900">
-                {devices.filter((d) => getAlertLevel(d) === "high").length}
+                {suppliedPurifiers.filter((d) => getAlertLevel(d) === "high").length}
               </div>
               <p className="text-xs text-blue-600 mt-1">Require attention</p>
             </CardContent>
@@ -330,7 +567,7 @@ export default function BusinessDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {devices.map((device) => (
+                {suppliedPurifiers.map((device) => (
                   <div key={device.device_id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                     <div className="flex items-center space-x-3">
                       <div className={`w-3 h-3 rounded-full ${getStatusColor(device.status)}`}></div>
@@ -460,7 +697,7 @@ export default function BusinessDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {devices.map((device) => (
+                {suppliedPurifiers.map((device) => (
                   <div key={device.device_id} className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-blue-900">
@@ -495,7 +732,7 @@ export default function BusinessDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {devices
+              {suppliedPurifiers
                 .filter((device) => getAlertLevel(device) === "high")
                 .map((device) => (
                   <div
@@ -525,7 +762,7 @@ export default function BusinessDashboard() {
                     </Button>
                   </div>
                 ))}
-              {devices.filter((device) => getAlertLevel(device) === "high").length === 0 && (
+              {suppliedPurifiers.filter((device) => getAlertLevel(device) === "high").length === 0 && (
                 <p className="text-center text-blue-600 py-4">No active alerts - all systems operating normally</p>
               )}
             </div>
