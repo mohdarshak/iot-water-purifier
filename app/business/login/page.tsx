@@ -10,28 +10,31 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Building2, Eye, EyeOff } from "lucide-react"
+import { signInWithEmail } from '../../../lib/auth';
 
 export default function BusinessLogin() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [message, setMessage] = useState("");
   const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+    e.preventDefault();
+    setIsLoading(true);
+    setMessage("");
 
-    // Hardcoded demo credentials
-    if (email === "business@demo.com" && password === "demo123") {
-      setTimeout(() => {
-        router.push("/business/dashboard")
-      }, 1000)
-    } else {
-      alert("Demo credentials: business@demo.com / demo123")
-      setIsLoading(false)
+    const { error } = await signInWithEmail(email, password);
+    if (error) {
+      setMessage(error.message);
+      setIsLoading(false);
+      return;
     }
-  }
+    // Success: redirect
+    setMessage('Login successful! Redirecting...');
+    setTimeout(() => router.push("/business/dashboard"), 1000);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
@@ -88,9 +91,14 @@ export default function BusinessLogin() {
                 </Button>
               </div>
             </div>
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
+            <Button
+              type="submit"
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+              disabled={isLoading}
+            >
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
+            {message && <p className="text-center text-sm mt-2 text-blue-700">{message}</p>}
           </form>
 
           <div className="mt-6 text-center">

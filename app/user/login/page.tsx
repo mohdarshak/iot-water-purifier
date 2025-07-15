@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Droplets, Eye, EyeOff } from "lucide-react"
+import { signInWithEmail } from '../../../lib/auth';
 
 export default function UserLogin() {
   const [email, setEmail] = useState("")
@@ -17,21 +18,23 @@ export default function UserLogin() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const [message, setMessage] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+    e.preventDefault();
+    setIsLoading(true);
+    setMessage("");
 
-    // Hardcoded demo credentials
-    if (email === "user@demo.com" && password === "demo123") {
-      setTimeout(() => {
-        router.push("/user/dashboard")
-      }, 1000)
-    } else {
-      alert("Demo credentials: user@demo.com / demo123")
-      setIsLoading(false)
+    const { error } = await signInWithEmail(email, password);
+    if (error) {
+      setMessage(error.message);
+      setIsLoading(false);
+      return;
     }
-  }
+    // Success: redirect
+    setMessage('Login successful! Redirecting...');
+    setTimeout(() => router.push("/user/dashboard"), 1000);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 flex items-center justify-center p-4 relative overflow-hidden">
@@ -100,6 +103,7 @@ export default function UserLogin() {
             >
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
+            {message && <p className="text-center text-sm mt-2 text-blue-700">{message}</p>}
           </form>
 
           <div className="mt-6 text-center">

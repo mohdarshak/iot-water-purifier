@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Droplets, Eye, EyeOff } from "lucide-react"
+import { signUpWithEmail } from '../../../lib/auth';
+import { supabase } from '../../../lib/supabaseClient';
 
 export default function UserSignup() {
   const [formData, setFormData] = useState({
@@ -18,34 +20,59 @@ export default function UserSignup() {
     password: "",
     confirmPassword: "",
     phone: "",
+    role: "renter", // default role
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const [message, setMessage] = useState('');
 
   const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+    e.preventDefault();
+    setIsLoading(true);
+    setMessage('');
 
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords don't match!")
-      setIsLoading(false)
-      return
+      setMessage("Passwords don't match!");
+      setIsLoading(false);
+      return;
     }
 
-    // Simulate signup process
-    setTimeout(() => {
-      alert("Account created successfully! You can now login with user@demo.com / demo123")
-      router.push("/user/login")
-    }, 1000)
+    // Supabase signup
+    const { data, error } = await signUpWithEmail(formData.email, formData.password);
+    if (error) {
+      setMessage(error.message);
+      setIsLoading(false);
+      return;
+    }
+
+    // Insert into 'users' table with role
+    if (data.user) {
+      const { error: userError } = await supabase.from('users').insert([
+        {
+          id: data.user.id,
+          name: formData.name,
+          role: formData.role,
+        },
+      ]);
+      if (userError) {
+        setMessage('Signup succeeded, but failed to save user info: ' + userError.message);
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    setMessage('Account created successfully! Please check your email to confirm your account.');
+    setIsLoading(false);
+    setTimeout(() => router.push('/user/login'), 2000);
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
-    })
-  }
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 flex items-center justify-center p-4 relative overflow-hidden">
@@ -110,6 +137,22 @@ export default function UserSignup() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="role" className="text-blue-900">
+                Role
+              </Label>
+              <select
+                id="role"
+                name="role"
+                value={formData.role}
+                onChange={handleInputChange}
+                className="border-blue-200 focus:border-blue-500 w-full rounded-md p-2"
+                required
+              >
+                <option value="owner">Owner</option>
+                <option value="renter">Renter</option>
+              </select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="password" className="text-blue-900">
                 Password
               </Label>
@@ -161,6 +204,7 @@ export default function UserSignup() {
             >
               {isLoading ? "Creating Account..." : "Create Account"}
             </Button>
+            {message && <p className="text-center text-sm mt-2 text-blue-700">{message}</p>}
           </form>
 
           <div className="mt-6 text-center">
