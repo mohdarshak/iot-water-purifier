@@ -35,7 +35,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
           <div className="backdrop-blur-sm bg-white/30 rounded-3xl p-12 border border-white/20 shadow-2xl">
             <h2 className="text-6xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 bg-clip-text text-transparent mb-6">
-              Smart Water Purification
+              Intelligent Water Purification
             </h2>
             <p className="text-xl text-blue-800/80 mb-12 max-w-3xl mx-auto font-medium">
               Monitor your water quality in real-time with our intelligent IoT water purifiers. Perfect for homes and
